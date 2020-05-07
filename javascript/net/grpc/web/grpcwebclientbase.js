@@ -196,7 +196,10 @@ GrpcWebClientBase.prototype.startStream_ = function(request, hostname) {
   if (this.format_ == 'text') {
     payload = googCrypt.encodeByteArray(payload);
   } else if (this.format_ == 'binary') {
-    xhr.setResponseType(XhrIo.ResponseType.ARRAY_BUFFER);
+    // Use TEXT instead of ARRAY_BUFFER since only TEXT allows partial read of the response while
+    // the request is still open. This means that the parser needs to convert it from a string to
+    // a byte buffer.
+    xhr.setResponseType(XhrIo.ResponseType.TEXT);
   }
   xhr.send(path, 'POST', payload);
   return stream;

@@ -129,6 +129,13 @@ const GrpcWebClientReadableStream = function(genericTransportInterface) {
    */
   this.parser_ = new GrpcWebStreamParser();
 
+  /**
+   * @private
+   * @type {!TextEncoder} A text encoder used to convert text responses into array buffers
+   * @const
+   */
+  this.textEncoder_ = new TextEncoder();
+
   var self = this;
   events.listen(this.xhr_, EventType.READY_STATE_CHANGE,
                 function(e) {
@@ -144,8 +151,18 @@ const GrpcWebClientReadableStream = function(genericTransportInterface) {
       self.pos_ = newPos;
       var byteSource = googCrypt.decodeStringToUint8Array(newData);
     } else if (googString.startsWith(contentType, 'application/grpc')) {
-      var byteSource = new Uint8Array(
-        /** @type {!ArrayBuffer} */ (self.xhr_.getResponse()));
+      // Read the responseText property since this one is updated as streaming happens. response
+      // does not, so it can't be used until the request is finalized.
+      // Since responseText contains all the bytes since the beginning of the request, slice
+      // the response from the last processed byte, so as not to repeat previous messages.
+      var unprocessedResponse = self.xhr_.getResponseText().slice(self.pos_)
+
+      // responseText is a string value, but we need to convert it into a byte buffer. It seems
+      // TextEncoder does the trick nicely.
+      var byteSource = self.textEncoder_.encode(unprocessedResponse);
+
+      // Store the position in the response that we have processed for subsequent events.
+      self.pos_ = responseText.length;
     } else {
       return;
     }
